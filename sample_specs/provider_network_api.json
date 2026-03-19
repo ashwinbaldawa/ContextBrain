@@ -1,0 +1,208 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Provider Network API",
+    "version": "4.0.1",
+    "description": "Search and retrieve provider information including in-network status, specialties, locations, and availability. Supports member-specific network matching."
+  },
+  "servers": [
+    {
+      "url": "https://api.internal.example.com/providers/v4",
+      "description": "Production"
+    }
+  ],
+  "security": [
+    {
+      "ApiKey": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  },
+  "paths": {
+    "/providers/search": {
+      "get": {
+        "operationId": "searchProviders",
+        "summary": "Search for providers",
+        "description": "Search for healthcare providers by specialty, location, name, or other criteria. Returns in-network status when a member ID or plan is provided.",
+        "parameters": [
+          {
+            "name": "specialty",
+            "in": "query",
+            "description": "Provider specialty (e.g., cardiology, primary_care, behavioral_health)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "zipCode",
+            "in": "query",
+            "description": "ZIP code for location-based search",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "radiusMiles",
+            "in": "query",
+            "description": "Search radius in miles from ZIP code",
+            "schema": { "type": "integer", "default": 25 }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "description": "Provider name (partial match supported)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "memberId",
+            "in": "query",
+            "description": "Member ID to check in-network status against their plan",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "acceptingNewPatients",
+            "in": "query",
+            "schema": { "type": "boolean" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": { "type": "integer", "default": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of matching providers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "providerId": { "type": "string" },
+                          "npi": { "type": "string" },
+                          "name": { "type": "string" },
+                          "specialty": { "type": "string" },
+                          "inNetwork": { "type": "boolean" },
+                          "acceptingNewPatients": { "type": "boolean" },
+                          "address": { "type": "object" },
+                          "phone": { "type": "string" },
+                          "distanceMiles": { "type": "number" },
+                          "rating": { "type": "number" }
+                        }
+                      }
+                    },
+                    "totalCount": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/providers/{providerId}": {
+      "get": {
+        "operationId": "getProviderDetails",
+        "summary": "Get provider details",
+        "description": "Retrieve complete profile for a specific provider including all locations, credentials, network affiliations, and accepted plans.",
+        "parameters": [
+          {
+            "name": "providerId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provider details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providerId": { "type": "string" },
+                    "npi": { "type": "string" },
+                    "name": { "type": "string" },
+                    "credentials": { "type": "string" },
+                    "specialties": { "type": "array", "items": { "type": "string" } },
+                    "boardCertifications": { "type": "array", "items": { "type": "string" } },
+                    "languages": { "type": "array", "items": { "type": "string" } },
+                    "locations": { "type": "array", "items": { "type": "object" } },
+                    "acceptedPlans": { "type": "array", "items": { "type": "string" } },
+                    "acceptingNewPatients": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/providers/{providerId}/availability": {
+      "get": {
+        "operationId": "getProviderAvailability",
+        "summary": "Get provider appointment availability",
+        "description": "Check available appointment slots for a provider. Supports filtering by appointment type and date range.",
+        "parameters": [
+          {
+            "name": "providerId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "appointmentType",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["new_patient", "follow_up", "urgent", "telehealth"] }
+          },
+          {
+            "name": "fromDate",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "toDate",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Available appointment slots",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providerId": { "type": "string" },
+                    "slots": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "datetime": { "type": "string", "format": "date-time" },
+                          "type": { "type": "string" },
+                          "locationId": { "type": "string" },
+                          "durationMinutes": { "type": "integer" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

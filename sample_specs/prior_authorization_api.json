@@ -1,0 +1,160 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Prior Authorization API",
+    "version": "2.3.0",
+    "description": "Manage prior authorization requests for medical procedures and services. Supports submission, status checks, and clinical review workflows."
+  },
+  "servers": [
+    {
+      "url": "https://api.internal.example.com/prior-auth/v2",
+      "description": "Production"
+    }
+  ],
+  "security": [{ "BearerAuth": [] }],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    }
+  },
+  "paths": {
+    "/authorizations/{authId}": {
+      "get": {
+        "operationId": "getAuthorizationStatus",
+        "summary": "Get prior authorization status",
+        "description": "Retrieve the current status and details of a prior authorization request including clinical review decisions.",
+        "parameters": [
+          { "name": "authId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorization details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authId": { "type": "string" },
+                    "memberId": { "type": "string" },
+                    "status": { "type": "string", "enum": ["pending", "approved", "denied", "expired", "in_review"] },
+                    "requestedService": { "type": "string" },
+                    "procedureCode": { "type": "string" },
+                    "requestingProvider": { "type": "string" },
+                    "approvedUnits": { "type": "integer" },
+                    "effectiveDate": { "type": "string", "format": "date" },
+                    "expirationDate": { "type": "string", "format": "date" },
+                    "reviewNotes": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/members/{memberId}/authorizations": {
+      "get": {
+        "operationId": "getMemberAuthorizations",
+        "summary": "List authorizations for a member",
+        "description": "Get all prior authorization requests for a member, with optional status and date filters.",
+        "parameters": [
+          { "name": "memberId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "activeOnly", "in": "query", "schema": { "type": "boolean", "default": false } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of authorizations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authorizations": { "type": "array", "items": { "type": "object" } },
+                    "totalCount": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/authorizations": {
+      "post": {
+        "operationId": "submitAuthorization",
+        "summary": "Submit a prior authorization request",
+        "description": "Submit a new prior authorization request. Requires member, provider, and clinical information. Some requests may be auto-approved based on clinical rules.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["memberId", "requestingProviderId", "procedureCode", "diagnosisCodes"],
+                "properties": {
+                  "memberId": { "type": "string" },
+                  "requestingProviderId": { "type": "string" },
+                  "servicingProviderId": { "type": "string" },
+                  "procedureCode": { "type": "string" },
+                  "diagnosisCodes": { "type": "array", "items": { "type": "string" } },
+                  "requestedUnits": { "type": "integer" },
+                  "urgency": { "type": "string", "enum": ["routine", "urgent", "emergent"] },
+                  "clinicalNotes": { "type": "string" },
+                  "attachments": { "type": "array", "items": { "type": "string", "description": "Document IDs" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Authorization request created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authId": { "type": "string" },
+                    "status": { "type": "string" },
+                    "estimatedReviewDate": { "type": "string", "format": "date" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/services/{procedureCode}/auth-required": {
+      "get": {
+        "operationId": "checkAuthRequired",
+        "summary": "Check if a service requires prior authorization",
+        "description": "Determine whether a specific procedure code requires prior authorization for a given plan. Returns the auth requirement and any clinical criteria.",
+        "parameters": [
+          { "name": "procedureCode", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "planId", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auth requirement details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "procedureCode": { "type": "string" },
+                    "authRequired": { "type": "boolean" },
+                    "clinicalCriteria": { "type": "string" },
+                    "autoApprovalEligible": { "type": "boolean" },
+                    "expectedTurnaround": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

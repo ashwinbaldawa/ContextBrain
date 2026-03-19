@@ -1,0 +1,211 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Claims Processing API",
+    "version": "2.1.0",
+    "description": "Query and manage health insurance claims. Supports claim status lookup, claim submission, and EOB retrieval."
+  },
+  "servers": [
+    {
+      "url": "https://api.internal.example.com/claims/v2",
+      "description": "Production"
+    }
+  ],
+  "security": [
+    {
+      "OAuth2": ["claims.read", "claims.write"]
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "OAuth2": {
+        "type": "oauth2",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://auth.internal.example.com/oauth/token",
+            "scopes": {
+              "claims.read": "Read claim data",
+              "claims.write": "Submit and modify claims"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/claims/{claimId}": {
+      "get": {
+        "operationId": "getClaimStatus",
+        "summary": "Get claim status and details",
+        "description": "Retrieves the current processing status, line items, and payment details for a specific claim.",
+        "parameters": [
+          {
+            "name": "claimId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Claim details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "claimId": { "type": "string" },
+                    "memberId": { "type": "string" },
+                    "providerId": { "type": "string" },
+                    "status": {
+                      "type": "string",
+                      "enum": ["received", "processing", "approved", "denied", "appealed", "paid"]
+                    },
+                    "dateOfService": { "type": "string", "format": "date" },
+                    "dateSubmitted": { "type": "string", "format": "date" },
+                    "totalBilled": { "type": "number" },
+                    "totalAllowed": { "type": "number" },
+                    "totalPaid": { "type": "number" },
+                    "memberResponsibility": { "type": "number" },
+                    "lineItems": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "procedureCode": { "type": "string" },
+                          "description": { "type": "string" },
+                          "billedAmount": { "type": "number" },
+                          "allowedAmount": { "type": "number" },
+                          "status": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/members/{memberId}/claims": {
+      "get": {
+        "operationId": "getMemberClaims",
+        "summary": "List claims for a member",
+        "description": "Returns all claims for a member with optional date range and status filters. Supports pagination.",
+        "parameters": [
+          {
+            "name": "memberId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "fromDate",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "toDate",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 1 }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 20, "maximum": 100 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of claims",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "claims": { "type": "array", "items": { "type": "object" } },
+                    "totalCount": { "type": "integer" },
+                    "page": { "type": "integer" },
+                    "pageSize": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/claims": {
+      "post": {
+        "operationId": "submitClaim",
+        "summary": "Submit a new claim",
+        "description": "Submit a new health insurance claim for processing. Requires provider and member information along with service details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["memberId", "providerId", "dateOfService", "lineItems"],
+                "properties": {
+                  "memberId": { "type": "string" },
+                  "providerId": { "type": "string" },
+                  "dateOfService": { "type": "string", "format": "date" },
+                  "facilityType": { "type": "string" },
+                  "referralNumber": { "type": "string" },
+                  "lineItems": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "procedureCode": { "type": "string" },
+                        "diagnosisCodes": { "type": "array", "items": { "type": "string" } },
+                        "units": { "type": "integer" },
+                        "billedAmount": { "type": "number" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Claim submitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "claimId": { "type": "string" },
+                    "status": { "type": "string" },
+                    "estimatedProcessingDate": { "type": "string", "format": "date" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,249 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Member Eligibility API",
+    "version": "3.2.0",
+    "description": "Verifies member health plan eligibility and benefit coverage. Supports real-time eligibility checks for medical, behavioral health, and pharmacy benefits."
+  },
+  "servers": [
+    {
+      "url": "https://api.internal.example.com/eligibility/v3",
+      "description": "Production"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/members/{memberId}/eligibility": {
+      "get": {
+        "operationId": "checkEligibility",
+        "summary": "Check member eligibility status",
+        "description": "Returns the current eligibility status for a member including plan details, coverage dates, and active benefits.",
+        "parameters": [
+          {
+            "name": "memberId",
+            "in": "path",
+            "required": true,
+            "description": "Unique member identifier",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asOfDate",
+            "in": "query",
+            "required": false,
+            "description": "Check eligibility as of this date (YYYY-MM-DD). Defaults to today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eligibility status returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "memberId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["active", "inactive", "pending", "terminated"]
+                    },
+                    "planName": {
+                      "type": "string"
+                    },
+                    "groupId": {
+                      "type": "string"
+                    },
+                    "effectiveDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "terminationDate": {
+                      "type": "string",
+                      "format": "date",
+                      "nullable": true
+                    },
+                    "benefits": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "category": {
+                            "type": "string"
+                          },
+                          "covered": {
+                            "type": "boolean"
+                          },
+                          "copay": {
+                            "type": "number"
+                          },
+                          "coinsurance": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/members/{memberId}/benefits/{serviceCategory}": {
+      "get": {
+        "operationId": "checkBenefitCoverage",
+        "summary": "Check benefit coverage for a specific service category",
+        "description": "Checks whether a member's plan covers a specific service category (e.g., behavioral_health, physical_therapy, durable_medical_equipment).",
+        "parameters": [
+          {
+            "name": "memberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serviceCategory",
+            "in": "path",
+            "required": true,
+            "description": "Service category code",
+            "schema": {
+              "type": "string",
+              "enum": ["medical", "behavioral_health", "physical_therapy", "durable_medical_equipment", "lab", "imaging"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Benefit coverage details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "memberId": {
+                      "type": "string"
+                    },
+                    "serviceCategory": {
+                      "type": "string"
+                    },
+                    "covered": {
+                      "type": "boolean"
+                    },
+                    "requiresPreAuth": {
+                      "type": "boolean"
+                    },
+                    "copay": {
+                      "type": "number"
+                    },
+                    "deductibleApplies": {
+                      "type": "boolean"
+                    },
+                    "annualLimit": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "remainingVisits": {
+                      "type": "integer",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/members/batch-eligibility": {
+      "post": {
+        "operationId": "batchEligibilityCheck",
+        "summary": "Batch eligibility check for multiple members",
+        "description": "Check eligibility status for up to 100 members in a single request. Useful for care management programs that need to verify a cohort.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "memberIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 100
+                  },
+                  "asOfDate": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                },
+                "required": ["memberIds"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch eligibility results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "memberId": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "planName": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "totalChecked": {
+                      "type": "integer"
+                    },
+                    "activeCount": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

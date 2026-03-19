@@ -1,0 +1,21 @@
+[project]
+name = "apibrain"
+version = "0.1.0"
+description = "AI-powered API Discovery Platform for Enterprise Organizations"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "APIBrain Contributors"}
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
