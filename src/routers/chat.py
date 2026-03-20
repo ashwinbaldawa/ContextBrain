@@ -19,11 +19,10 @@ async def chat_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Conversational API discovery.
+    Conversational API discovery powered by Gemini.
 
     Send a natural language message and get an AI-powered response
     that helps you find and understand the right APIs for your use case.
-    Supports multi-turn conversations via conversation_id.
     """
     response_text, referenced_apis, conversation_id = await chat(
         db=db,

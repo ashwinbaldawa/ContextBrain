@@ -189,7 +189,7 @@ function ChatMessage({ msg }) {
         {msg.role === "user" ? "A" : "🧠"}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", margin: "0 0 6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>{msg.role === "user" ? "You" : "APIBrain"}</p>
+        <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", margin: "0 0 6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>{msg.role === "user" ? "You" : "ContextBrain"}</p>
         <div style={{ fontSize: 13.5, lineHeight: 1.65, color: "var(--text-primary)", whiteSpace: "pre-wrap" }}>{msg.content}</div>
         {msg.apis?.length > 0 && (
           <div style={{ marginTop: 14 }}>{msg.apis.map((r, i) => <ApiCard key={i} result={r} />)}</div>
@@ -485,7 +485,7 @@ function UploadPanel({ onIngest }) {
         <div style={{ marginTop: 24, padding: 16, background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: 12 }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 8px" }}>💡 What can I upload?</p>
           <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6, margin: 0 }}>
-            Any valid OpenAPI 3.x or Swagger 2.x specification in JSON format. The spec should contain at minimum an <code style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, background: "var(--bg-tag)", padding: "1px 5px", borderRadius: 4 }}>info</code> block and a <code style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, background: "var(--bg-tag)", padding: "1px 5px", borderRadius: 4 }}>paths</code> block. APIBrain will automatically extract all endpoints, auth mechanisms, and metadata. You can add business domain and ownership info to make the API easier to discover.
+            Any valid OpenAPI 3.x or Swagger 2.x specification in JSON format. The spec should contain at minimum an <code style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, background: "var(--bg-tag)", padding: "1px 5px", borderRadius: 4 }}>info</code> block and a <code style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, background: "var(--bg-tag)", padding: "1px 5px", borderRadius: 4 }}>paths</code> block. ContextBrain will automatically extract all endpoints, auth mechanisms, and metadata. You can add business domain and ownership info to make the API easier to discover.
           </p>
           <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
             <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: "var(--bg-tag)", color: "var(--text-tag)" }}>OpenAPI 3.0</span>
@@ -499,7 +499,7 @@ function UploadPanel({ onIngest }) {
 }
 
 // --- Main App ---
-export default function APIBrain() {
+export default function ContextBrain() {
   const [view, setView] = useState("chat");
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -560,9 +560,9 @@ export default function APIBrain() {
         <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid var(--border-main)" }}>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, letterSpacing: "-0.03em", display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontSize: 16 }}>🧠</span>
-            APIBrain
+            ContextBrain
           </h1>
-          <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-muted)", letterSpacing: "0.02em" }}>AI-Powered API Discovery</p>
+          <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-muted)", letterSpacing: "0.02em" }}>AI-Powered Context Discovery</p>
         </div>
         <nav style={{ padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
           {navItems.map(item => (

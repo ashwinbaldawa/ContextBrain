@@ -5,16 +5,21 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    # Database
-    database_url: str = "postgresql+asyncpg://apibrain:apibrain@localhost:5432/apibrain"
-    database_url_sync: str = "postgresql://apibrain:apibrain@localhost:5432/apibrain"
+    # Database (relational)
+    database_url: str = "postgresql+asyncpg://contextbrain:contextbrain@localhost:5432/contextbrain"
+    database_url_sync: str = "postgresql://contextbrain:contextbrain@localhost:5432/contextbrain"
 
-    # Anthropic
-    anthropic_api_key: str = ""
+    # Google Gemini
+    google_api_key: str = ""
+    gemini_llm_model: str = "gemini-2.0-flash"
+    gemini_embedding_model: str = "text-embedding-004"
 
-    # Embedding
-    embedding_model: str = "voyage-3"
-    embedding_dimensions: int = 1024
+    # ChromaDB
+    chroma_mode: str = "local"  # "local" or "http"
+    chroma_persist_dir: str = "./chroma_data"
+    chroma_host: str = "localhost"
+    chroma_port: int = 8100
+    chroma_collection_name: str = "contextbrain_apis"
 
     # Application
     app_env: str = "development"
@@ -24,7 +29,10 @@ class Settings(BaseSettings):
 
     # Search
     search_top_k: int = 10
-    search_similarity_threshold: float = 0.3
+
+    # Future: Vertex AI
+    gcp_project_id: str = ""
+    gcp_location: str = "us-central1"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

@@ -1,4 +1,4 @@
-# API Intelligence Platform — "APIBrain"
+# ContextBrain — Context Discovery Platform
 
 ## Strategic Plan & Architecture Blueprint
 
@@ -8,11 +8,11 @@
 
 Large healthcare organizations maintain hundreds of internal APIs across domains — eligibility, claims, benefits, provider networks, care management, pharmacy, and more. These APIs are registered in a centralized gateway (e.g., AXWAY), but **discovering the right API for a given business need remains a painful, people-dependent process** that can take days or weeks.
 
-**APIBrain** is an AI-powered platform that sits on top of the existing API gateway and transforms how developers discover, understand, integrate, and operationalize APIs — especially for building AI agent capabilities.
+**ContextBrain** is an AI-powered platform that sits on top of the existing API gateway and transforms how developers discover, understand, integrate, and operationalize APIs — especially for building AI agent capabilities.
 
 ### The Three Problems It Solves
 
-| # | Problem Today | APIBrain Solution |
+| # | Problem Today | ContextBrain Solution |
 |---|--------------|-------------------|
 | 1 | **Discovery is human-dependent** — developers ask around in Slack, meetings, and emails to find the right API | AI-powered semantic search over the entire API catalog with business-context understanding |
 | 2 | **Integration is slow** — reading specs, understanding auth, writing wrappers takes days per API | Automated tool/wrapper code generation from specs + accumulated team annotations |
@@ -32,16 +32,16 @@ Large healthcare organizations maintain hundreds of internal APIs across domains
 ### Primary Personas
 
 **Persona 1: The AI Developer**
-Building an AI-powered care coordination assistant. Needs to call 8 different internal APIs (eligibility, benefits, prior auth, provider search, care gaps, pharmacy, claims history, member profile). Today: 3-4 weeks just figuring out which APIs exist and writing integration code. With APIBrain: 2-3 days.
+Building an AI-powered care coordination assistant. Needs to call 8 different internal APIs (eligibility, benefits, prior auth, provider search, care gaps, pharmacy, claims history, member profile). Today: 3-4 weeks just figuring out which APIs exist and writing integration code. With ContextBrain: 2-3 days.
 
 **Persona 2: The Application Developer**
-Building a new member portal feature. Needs to integrate with 2-3 APIs but doesn't know which ones, what version, or who to ask. Today: a week of Slack messages and meetings. With APIBrain: an afternoon.
+Building a new member portal feature. Needs to integrate with 2-3 APIs but doesn't know which ones, what version, or who to ask. Today: a week of Slack messages and meetings. With ContextBrain: an afternoon.
 
 **Persona 3: The Architect / Tech Lead**
-Designing a new microservice. Needs to understand what capabilities already exist as APIs to avoid duplication. Today: review meetings with multiple teams. With APIBrain: a comprehensive search in minutes.
+Designing a new microservice. Needs to understand what capabilities already exist as APIs to avoid duplication. Today: review meetings with multiple teams. With ContextBrain: a comprehensive search in minutes.
 
 **Persona 4: The API Producer**
-Owns an API that other teams struggle to use correctly. Gets repeat questions about the same edge cases. Today: answers the same Slack DMs over and over. With APIBrain: documents it once as annotations, never answers the same question again.
+Owns an API that other teams struggle to use correctly. Gets repeat questions about the same edge cases. Today: answers the same Slack DMs over and over. With ContextBrain: documents it once as annotations, never answers the same question again.
 
 ### Use Case Scenarios
 
@@ -50,7 +50,7 @@ Owns an API that other teams struggle to use correctly. Gets repeat questions ab
 Developer: I need to verify if a member's plan covers behavioral health services.
             What API should I use?
 
-APIBrain:  There are 2 relevant APIs:
+ContextBrain:  There are 2 relevant APIs:
 
            1. Benefits Eligibility API (v3.2)
               - Owner: Benefits Platform Team (contact: Jane Doe)
@@ -77,7 +77,7 @@ APIBrain:  There are 2 relevant APIs:
 Developer: Yes, generate a Python tool wrapper for the Benefits Eligibility API
            that I can use with Google ADK.
 
-APIBrain:  [Generates complete, tested code]:
+ContextBrain:  [Generates complete, tested code]:
            - ADK tool definition with proper schema
            - HTTP call logic with AXWAY auth headers
            - Error handling for known edge cases (from annotations)
@@ -90,7 +90,7 @@ APIBrain:  [Generates complete, tested code]:
 Developer: The eligibility API returns an empty response when the member
            has a dependent-only plan. The spec doesn't mention this.
 
-APIBrain:  Got it. I'll add this as an annotation to the Benefits Eligibility API:
+ContextBrain:  Got it. I'll add this as an annotation to the Benefits Eligibility API:
            "Returns empty response for dependent-only plans. Must pass the
            subscriber's member ID with dependent relationship indicator."
 
@@ -106,7 +106,7 @@ APIBrain:  Got it. I'll add this as an annotation to the Benefits Eligibility AP
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         APIBrain Platform                           │
+│                         ContextBrain Platform                           │
 │                                                                     │
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────────┐ │
 │  │  Ingestion    │  │  Intelligence │  │  Consumption Layer        │ │
@@ -181,7 +181,7 @@ APIBrain:  Got it. I'll add this as an annotation to the Benefits Eligibility AP
   - Business description and use-case guidance
   - All annotations (team knowledge, gotchas, workarounds)
   - Related APIs (commonly used together)
-  - Usage stats (how often this API is queried in APIBrain, trending)
+  - Usage stats (how often this API is queried in ContextBrain, trending)
 
 **Feedback Loop**
 - Track which search results developers actually use (click-through)
@@ -339,7 +339,7 @@ usage_logs
 | Week | Deliverable |
 |------|-------------|
 | 19-20 | **MCP server**: Expose the tool registry as an MCP server. Any MCP-compatible client can discover and use approved tools. |
-| 21-22 | **AXWAY auto-sync**: Automated bidirectional sync — new APIs in AXWAY auto-appear in APIBrain; annotations from APIBrain can feed back as supplementary docs in AXWAY. Webhook-based real-time sync. |
+| 21-22 | **AXWAY auto-sync**: Automated bidirectional sync — new APIs in AXWAY auto-appear in ContextBrain; annotations from ContextBrain can feed back as supplementary docs in AXWAY. Webhook-based real-time sync. |
 | 23-24 | **Multi-agent composition**: Interface for composing multiple tools into agent workflows. "I need an agent that does eligibility + prior auth + provider search" → generates a complete multi-tool agent scaffold. |
 
 ---
@@ -372,7 +372,7 @@ usage_logs
 
 - **Safety**: Generated code is reviewed by a human before it touches production. In healthcare, a bad runtime API call could access PHI or trigger clinical actions
 - **Compliance**: Audit trail is clear — code was generated, reviewed, approved, deployed
-- **Reliability**: No runtime dependency on the AI layer. If APIBrain goes down, all existing tools continue to work
+- **Reliability**: No runtime dependency on the AI layer. If ContextBrain goes down, all existing tools continue to work
 - **Performance**: No latency overhead in production. Tools are pre-compiled, not generated on the fly
 
 ---
@@ -391,13 +391,13 @@ usage_logs
 - API ownership verification for annotation approval
 
 ### HIPAA Alignment
-- No PHI stored or processed in APIBrain at any point
+- No PHI stored or processed in ContextBrain at any point
 - All AI calls use Claude API with appropriate data handling agreements
 - Audit logging on all actions (search, generate, annotate, deploy)
 - Generated code handles PHI safely at runtime (auth tokens, encryption, minimal data exposure) — enforced via code generation templates
 
 ### Network Security
-- APIBrain deployed behind VPC (same as domagent-backend)
+- ContextBrain deployed behind VPC (same as domagent-backend)
 - Access to AXWAY admin API via internal network only
 - Claude API calls routed through approved egress
 
@@ -463,16 +463,16 @@ usage_logs
 
 ## 10. Future Vision — The API Intelligence Ecosystem
 
-Once the foundation is in place, APIBrain evolves from a discovery tool into the **central intelligence layer for all API-driven development** in the organization:
+Once the foundation is in place, ContextBrain evolves from a discovery tool into the **central intelligence layer for all API-driven development** in the organization:
 
 **Near term (6-12 months)**:
-- Every new AI agent project starts at APIBrain instead of Slack
+- Every new AI agent project starts at ContextBrain instead of Slack
 - Tool library grows organically as teams contribute
 - API quality improves as annotation feedback reaches API owners
 - Database schemas become searchable alongside APIs
 
 **Medium term (1-2 years)**:
-- APIBrain becomes the default entry point for all integration work, not just AI
+- ContextBrain becomes the default entry point for all integration work, not just AI
 - Auto-detection of API changes (spec diffs) triggers re-generation of affected tools
 - Cross-API dependency mapping — "if you change this endpoint, these 12 tools break"
 - A2A (Agent-to-Agent) capability — agents discover and use other agents' capabilities

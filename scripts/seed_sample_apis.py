@@ -1,5 +1,5 @@
 """
-Seed script — loads sample healthcare API specs into the database
+Seed script — loads sample healthcare API specs into PostgreSQL + ChromaDB
 along with realistic annotations for demo purposes.
 
 Run after init_db.py: python scripts/seed_sample_apis.py
@@ -19,7 +19,6 @@ from src.services.ingestion import ingest_openapi_spec
 
 SAMPLE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sample_specs")
 
-# Sample APIs with metadata
 SAMPLES = [
     {
         "file": "member_eligibility_api.json",
@@ -51,70 +50,25 @@ SAMPLES = [
     },
 ]
 
-# Realistic annotations to seed
 ANNOTATIONS = {
     "Member Eligibility API": [
-        {
-            "content": "Dental and vision have separate endpoints — this API only covers medical and behavioral health benefits.",
-            "author": "dev_smith",
-            "category": "gotcha",
-        },
-        {
-            "content": "Returns empty response for dependent-only plans. Must pass the subscriber's member ID with a dependent relationship indicator.",
-            "author": "dev_patel",
-            "category": "gotcha",
-        },
-        {
-            "content": "Batch endpoint is rate-limited to 10 requests/minute per client. For large cohorts, add a delay between batches.",
-            "author": "dev_jones",
-            "category": "tip",
-        },
+        {"content": "Dental and vision have separate endpoints — this API only covers medical and behavioral health benefits.", "author": "dev_smith", "category": "gotcha"},
+        {"content": "Returns empty response for dependent-only plans. Must pass the subscriber's member ID with a dependent relationship indicator.", "author": "dev_patel", "category": "gotcha"},
+        {"content": "Batch endpoint is rate-limited to 10 requests/minute per client. For large cohorts, add a delay between batches.", "author": "dev_jones", "category": "tip"},
     ],
     "Claims Processing API": [
-        {
-            "content": "The status field uses lowercase values but the spec shows mixed case. Always compare case-insensitively.",
-            "author": "dev_chen",
-            "category": "correction",
-        },
-        {
-            "content": "OAuth token endpoint requires client_credentials grant, NOT authorization_code. The spec doesn't make this clear.",
-            "author": "dev_smith",
-            "category": "gotcha",
-        },
-        {
-            "content": "For claims older than 18 months, use the /claims/archive endpoint instead (not documented in the main spec).",
-            "author": "dev_kumar",
-            "category": "workaround",
-        },
+        {"content": "The status field uses lowercase values but the spec shows mixed case. Always compare case-insensitively.", "author": "dev_chen", "category": "correction"},
+        {"content": "OAuth token endpoint requires client_credentials grant, NOT authorization_code.", "author": "dev_smith", "category": "gotcha"},
+        {"content": "For claims older than 18 months, use the /claims/archive endpoint instead (not in the main spec).", "author": "dev_kumar", "category": "workaround"},
     ],
     "Provider Network API": [
-        {
-            "content": "The zipCode search uses a centroid-based radius, not driving distance. Results at the edge of the radius may be further by road.",
-            "author": "dev_johnson",
-            "category": "tip",
-        },
-        {
-            "content": "acceptingNewPatients data is updated weekly on Sundays. Don't rely on it for real-time availability.",
-            "author": "dev_patel",
-            "category": "gotcha",
-        },
+        {"content": "The zipCode search uses centroid-based radius, not driving distance. Edge results may be further by road.", "author": "dev_johnson", "category": "tip"},
+        {"content": "acceptingNewPatients data is updated weekly on Sundays. Don't rely on it for real-time availability.", "author": "dev_patel", "category": "gotcha"},
     ],
     "Prior Authorization API": [
-        {
-            "content": "Always call the eligibility API first to confirm active coverage before submitting a prior auth. The prior auth API assumes active coverage and returns a misleading success for inactive members.",
-            "author": "dev_jones",
-            "category": "gotcha",
-        },
-        {
-            "content": "The auto-approval engine runs only during business hours (8am-6pm ET). Submissions outside this window get queued for next business day.",
-            "author": "dev_wilson",
-            "category": "tip",
-        },
-        {
-            "content": "v2.2 had a bug where urgent requests were routed as routine. Fixed in v2.3 but some clients still reference the old version.",
-            "author": "dev_chen",
-            "category": "deprecation",
-        },
+        {"content": "Always call the eligibility API first to confirm active coverage before submitting a prior auth.", "author": "dev_jones", "category": "gotcha"},
+        {"content": "The auto-approval engine runs only during business hours (8am-6pm ET). Submissions outside this window get queued.", "author": "dev_wilson", "category": "tip"},
+        {"content": "v2.2 had a bug where urgent requests were routed as routine. Fixed in v2.3.", "author": "dev_chen", "category": "deprecation"},
     ],
 }
 
@@ -122,14 +76,12 @@ ANNOTATIONS = {
 async def seed():
     """Load sample APIs and annotations."""
     async with async_session() as db:
-        # Check if already seeded
         result = await db.execute(select(APICatalog).limit(1))
         if result.scalar_one_or_none():
             print("⚠️  Database already has data. Skipping seed.")
-            print("   To re-seed, drop the tables first: python scripts/init_db.py")
+            print("   To re-seed, drop the tables and clear ChromaDB first.")
             return
 
-        # Ingest each sample API
         api_name_to_id = {}
         for sample in SAMPLES:
             filepath = os.path.join(SAMPLE_DIR, sample["file"])
@@ -150,15 +102,13 @@ async def seed():
                 gateway_id=sample["gateway_id"],
             )
             api_name_to_id[api_record.name] = api_record.id
-            print(f"   ✅ {api_record.name} — {ep_count} endpoints")
+            print(f"   ✅ {api_record.name} — {ep_count} endpoints (DB + ChromaDB)")
 
-        # Add annotations
         print("\n📝 Adding annotations...")
         for api_name, notes in ANNOTATIONS.items():
             api_id = api_name_to_id.get(api_name)
             if not api_id:
                 continue
-
             for note in notes:
                 annotation = Annotation(
                     api_id=api_id,
@@ -172,8 +122,13 @@ async def seed():
         await db.commit()
 
     await engine.dispose()
-    print("\n🧠 APIBrain seeded successfully!")
-    print(f"   APIs: {len(api_name_to_id)}")
+
+    from src.services.vectorstore import get_collection_stats
+    stats = get_collection_stats()
+    print(f"\n🧠 ContextBrain seeded successfully!")
+    print(f"   APIs in PostgreSQL: {len(api_name_to_id)}")
+    print(f"   APIs in ChromaDB: {stats['api_count']}")
+    print(f"   Endpoints in ChromaDB: {stats['endpoint_count']}")
     print(f"   Annotations: {sum(len(v) for v in ANNOTATIONS.values())}")
 
 

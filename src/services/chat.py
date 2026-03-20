@@ -1,14 +1,14 @@
 """
-Chat service — conversational API discovery powered by Claude.
+Chat service — conversational API discovery powered by Google Gemini.
 
-Takes a developer's natural language question, searches the API catalog,
-and uses Claude to synthesize a helpful, context-rich answer.
+Takes a developer's natural language question, searches the API catalog
+via ChromaDB, and uses Gemini to synthesize a helpful, context-rich answer.
 """
 
 import logging
 import uuid
 
-import anthropic
+import google.generativeai as genai
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
@@ -22,62 +22,7 @@ settings = get_settings()
 _conversations: dict[str, list[dict]] = {}
 
 
-async def chat(
-    db: AsyncSession,
-    message: str,
-    conversation_id: str | None = None,
-) -> tuple[str, list[APICatalog], str]:
-    """
-    Process a chat message for API discovery.
-
-    1. Search the API catalog based on the message
-    2. Build context from search results (specs, annotations, etc.)
-    3. Send to Claude with the context for a synthesized response
-
-    Returns:
-        Tuple of (response text, referenced APIs, conversation ID)
-    """
-    # Manage conversation
-    if not conversation_id:
-        conversation_id = str(uuid.uuid4())
-    if conversation_id not in _conversations:
-        _conversations[conversation_id] = []
-
-    # Search for relevant APIs
-    search_results = await search_apis(db, message, top_k=5)
-
-    # Build context document from search results
-    context = _build_context(search_results)
-
-    # Build conversation history
-    history = _conversations[conversation_id]
-    history.append({"role": "user", "content": message})
-
-    # Call Claude
-    response_text = await _call_claude(context, history)
-
-    # Store assistant response in conversation
-    history.append({"role": "assistant", "content": response_text})
-
-    # Keep conversation history manageable
-    if len(history) > 20:
-        history[:] = history[-20:]
-
-    # Extract referenced APIs
-    referenced_apis = [r["api"] for r in search_results]
-
-    return response_text, referenced_apis, conversation_id
-
-
-async def _call_claude(context: str, conversation_history: list[dict]) -> str:
-    """Call Claude with API context and conversation history."""
-    if not settings.anthropic_api_key:
-        return _fallback_response(context)
-
-    try:
-        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-
-        system_prompt = f"""You are APIBrain, an AI assistant that helps developers discover and understand internal APIs in a large healthcare organization.
+SYSTEM_PROMPT = """You are ContextBrain, an AI assistant that helps developers discover and understand internal APIs in a large healthcare organization.
 
 You have access to the following API catalog information:
 
@@ -101,22 +46,85 @@ If the query doesn't match any APIs in the catalog, say so honestly and suggest 
 
 Keep responses concise and well-structured. Use the information from the catalog — don't make up APIs or endpoints that aren't in the context."""
 
-        response = await client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1500,
-            system=system_prompt,
-            messages=conversation_history,
+
+async def chat(
+    db: AsyncSession,
+    message: str,
+    conversation_id: str | None = None,
+) -> tuple[str, list[APICatalog], str]:
+    """
+    Process a chat message for API discovery.
+
+    1. Search the API catalog based on the message
+    2. Build context from search results
+    3. Send to Gemini with the context for a synthesized response
+
+    Returns:
+        Tuple of (response text, referenced APIs, conversation ID)
+    """
+    if not conversation_id:
+        conversation_id = str(uuid.uuid4())
+    if conversation_id not in _conversations:
+        _conversations[conversation_id] = []
+
+    # Search for relevant APIs
+    search_results = await search_apis(db, message, top_k=5)
+
+    # Build context document
+    context = _build_context(search_results)
+
+    # Build conversation history
+    history = _conversations[conversation_id]
+    history.append({"role": "user", "content": message})
+
+    # Call Gemini
+    response_text = await _call_gemini(context, history)
+
+    # Store response
+    history.append({"role": "assistant", "content": response_text})
+    if len(history) > 20:
+        history[:] = history[-20:]
+
+    referenced_apis = [r["api"] for r in search_results]
+    return response_text, referenced_apis, conversation_id
+
+
+async def _call_gemini(context: str, conversation_history: list[dict]) -> str:
+    """Call Gemini with API context and conversation history."""
+    if not settings.google_api_key:
+        return _fallback_response(context)
+
+    try:
+        genai.configure(api_key=settings.google_api_key)
+        model = genai.GenerativeModel(
+            settings.gemini_llm_model,
+            system_instruction=SYSTEM_PROMPT.format(context=context),
         )
 
-        return response.content[0].text.strip()
+        # Convert conversation history to Gemini format
+        gemini_history = []
+        for msg in conversation_history[:-1]:  # All except the last (current) message
+            role = "user" if msg["role"] == "user" else "model"
+            gemini_history.append({"role": role, "parts": [msg["content"]]})
+
+        chat_session = model.start_chat(history=gemini_history)
+
+        # Send the latest message
+        current_message = conversation_history[-1]["content"]
+        response = chat_session.send_message(
+            current_message,
+            generation_config={"max_output_tokens": 1500, "temperature": 0.4},
+        )
+
+        return response.text.strip()
 
     except Exception as e:
-        logger.error(f"Claude API call failed: {e}")
+        logger.error(f"Gemini API call failed: {e}")
         return _fallback_response(context)
 
 
 def _build_context(search_results: list[dict]) -> str:
-    """Build a context document from search results for Claude."""
+    """Build a context document from search results for Gemini."""
     if not search_results:
         return "No APIs found in the catalog matching this query."
 
@@ -157,9 +165,13 @@ Endpoints:"""
 
 
 def _fallback_response(context: str) -> str:
-    """Generate a basic response when Claude is unavailable."""
+    """Generate a basic response when Gemini is unavailable."""
     if "No APIs found" in context:
         return ("I couldn't find any APIs matching your query. "
                 "Try rephrasing or using different keywords.")
 
-    return f"Here's what I found in the API catalog:\n\n{context}\n\n(Note: AI-enhanced responses require an Anthropic API key. Set ANTHROPIC_API_KEY in your .env file.)"
+    return (
+        f"Here's what I found in the API catalog:\n\n{context}\n\n"
+        "(Note: AI-enhanced responses require a Google API key. "
+        "Set GOOGLE_API_KEY in your .env file.)"
+    )

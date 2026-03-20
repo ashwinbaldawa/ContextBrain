@@ -1,1 +1,1 @@
-"""APIBrain — AI-powered API Discovery Platform."""
+"""ContextBrain — AI-powered Context Discovery Platform."""

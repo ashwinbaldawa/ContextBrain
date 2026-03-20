@@ -1,16 +1,16 @@
 services:
   db:
-    image: pgvector/pgvector:pg17
+    image: postgres:17
     environment:
-      POSTGRES_USER: apibrain
-      POSTGRES_PASSWORD: apibrain
-      POSTGRES_DB: apibrain
+      POSTGRES_USER: contextbrain
+      POSTGRES_PASSWORD: contextbrain
+      POSTGRES_DB: contextbrain
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U apibrain"]
+      test: ["CMD-SHELL", "pg_isready -U contextbrain"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,8 +22,10 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://apibrain:apibrain@db:5432/apibrain
-      DATABASE_URL_SYNC: postgresql://apibrain:apibrain@db:5432/apibrain
+      DATABASE_URL: postgresql+asyncpg://contextbrain:contextbrain@db:5432/contextbrain
+      DATABASE_URL_SYNC: postgresql://contextbrain:contextbrain@db:5432/contextbrain
+      CHROMA_MODE: local
+      CHROMA_PERSIST_DIR: /app/chroma_data
     depends_on:
       db:
         condition: service_healthy
@@ -31,6 +33,8 @@ services:
       - ./src:/app/src
       - ./scripts:/app/scripts
       - ./sample_specs:/app/sample_specs
+      - chromadata:/app/chroma_data
 
 volumes:
   pgdata:
+  chromadata:

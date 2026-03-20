@@ -2,7 +2,6 @@
 
 import logging
 import yaml
-from io import BytesIO
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -55,8 +54,6 @@ async def ingest_spec_file(
     try:
         content = await file.read()
         text = content.decode("utf-8")
-
-        # Parse as YAML (also handles JSON since JSON is valid YAML)
         spec = yaml.safe_load(text)
 
         if not isinstance(spec, dict):

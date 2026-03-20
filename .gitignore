@@ -25,6 +25,9 @@ Thumbs.db
 # Database
 *.db
 
+# ChromaDB local storage
+chroma_data/
+
 # Logs
 *.log
 

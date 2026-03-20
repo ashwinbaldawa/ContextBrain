@@ -1,4 +1,8 @@
-"""SQLAlchemy models for the API catalog, endpoints, and usage logs."""
+"""SQLAlchemy models for the API catalog, endpoints, annotations, and usage logs.
+
+Note: Vector embeddings are stored in ChromaDB, not in PostgreSQL.
+PostgreSQL handles relational data only.
+"""
 
 import uuid
 from datetime import datetime, timezone
@@ -6,12 +10,8 @@ from datetime import datetime, timezone
 from sqlalchemy import String, Text, DateTime, Enum as SAEnum, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from pgvector.sqlalchemy import Vector
 
 from src.database import Base
-from src.config import get_settings
-
-settings = get_settings()
 
 
 class APICatalog(Base):
@@ -37,7 +37,6 @@ class APICatalog(Base):
     auth_mechanism: Mapped[str | None] = mapped_column(String(100), nullable=True)
     openapi_spec: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     gateway_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    embedding = mapped_column(Vector(settings.embedding_dimensions), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
@@ -80,7 +79,6 @@ class APIEndpoint(Base):
     request_schema: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     response_schema: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     parameters: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    embedding = mapped_column(Vector(settings.embedding_dimensions), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

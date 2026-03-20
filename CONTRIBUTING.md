@@ -1,4 +1,4 @@
-# Contributing to APIBrain
+# Contributing to ContextBrain
 
 Thanks for your interest in contributing! Here's how to get started.
 

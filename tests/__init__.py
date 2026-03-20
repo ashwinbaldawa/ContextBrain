@@ -1,1 +1,1 @@
-"""APIBrain tests."""
+"""ContextBrain tests."""

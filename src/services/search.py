@@ -1,20 +1,24 @@
 """
-Search service — semantic + hybrid search across the API catalog.
+Search service — hybrid search using ChromaDB (vector) + PostgreSQL (relational).
 
-Uses pgvector cosine similarity combined with keyword matching
-to find the most relevant APIs for a given query.
+Flow:
+1. Embed the query using Gemini (with retrieval_query task type)
+2. Search ChromaDB for similar APIs and endpoints
+3. Fetch full relational data from PostgreSQL
+4. Merge, deduplicate, and rank results
 """
 
 import logging
 from uuid import UUID
 
-from sqlalchemy import select, func, or_, cast, String, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.config import get_settings
 from src.models import APICatalog, APIEndpoint, Annotation
-from src.services.embedding import generate_embedding
+from src.services.embedding import generate_embedding_for_query
+from src.services import vectorstore
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -28,175 +32,110 @@ async def search_apis(
     top_k: int = 5,
 ) -> list[dict]:
     """
-    Search for APIs using a hybrid approach:
-    1. Semantic search (vector similarity on API descriptions)
-    2. Semantic search (vector similarity on endpoint descriptions)
-    3. Keyword matching (API name, endpoint path, descriptions)
-    4. Merge and re-rank results
+    Search for APIs using hybrid vector + relational approach.
 
-    Returns a list of results with API details, matching endpoints,
-    annotations, and relevance scores.
+    1. Embed the query
+    2. Search ChromaDB at API level and endpoint level
+    3. Fetch full details from PostgreSQL
+    4. Merge and rank
     """
-    query_embedding = await generate_embedding(query)
+    query_embedding = generate_embedding_for_query(query)
 
-    # --- Semantic search on APIs ---
-    api_results = await _search_api_level(db, query_embedding, query, domain, status, top_k)
+    # --- Search ChromaDB: API level ---
+    api_where = {}
+    if domain:
+        api_where["domain"] = domain
+    if status:
+        api_where["status"] = status
 
-    # --- Semantic search on Endpoints ---
-    endpoint_results = await _search_endpoint_level(db, query_embedding, query, domain, status, top_k)
-
-    # --- Merge results ---
-    merged = _merge_results(api_results, endpoint_results, top_k)
-
-    # --- Fetch annotations for top results ---
-    for result in merged:
-        annotations = await _get_annotations(db, result["api"].id)
-        result["annotations"] = annotations
-
-    return merged
-
-
-async def _search_api_level(
-    db: AsyncSession,
-    query_embedding: list[float],
-    query_text: str,
-    domain: str | None,
-    status: str | None,
-    top_k: int,
-) -> list[dict]:
-    """Search at the API level using vector similarity + keyword."""
-    # Vector similarity using cosine distance
-    similarity = (1 - APICatalog.embedding.cosine_distance(query_embedding)).label("similarity")
-
-    stmt = (
-        select(APICatalog, similarity)
-        .options(selectinload(APICatalog.endpoints))
-        .where(APICatalog.embedding.isnot(None))
+    api_results = vectorstore.search_apis(
+        query_embedding=query_embedding,
+        top_k=top_k,
+        where=api_where if api_where else None,
     )
 
-    if domain:
-        stmt = stmt.where(APICatalog.domain == domain)
-    if status:
-        stmt = stmt.where(APICatalog.status == status)
-
-    stmt = stmt.order_by(similarity.desc()).limit(top_k)
-
-    result = await db.execute(stmt)
-    rows = result.all()
-
-    return [
-        {
-            "api": row[0],
-            "endpoints": list(row[0].endpoints),
-            "relevance_score": float(row[1]),
-            "match_reason": "API description matches your query",
-            "source": "api_level",
-        }
-        for row in rows
-        if float(row[1]) > settings.search_similarity_threshold
-    ]
-
-
-async def _search_endpoint_level(
-    db: AsyncSession,
-    query_embedding: list[float],
-    query_text: str,
-    domain: str | None,
-    status: str | None,
-    top_k: int,
-) -> list[dict]:
-    """Search at the endpoint level and bubble up to parent APIs."""
-    similarity = (1 - APIEndpoint.embedding.cosine_distance(query_embedding)).label("similarity")
-
-    stmt = (
-        select(APIEndpoint, similarity, APICatalog)
-        .join(APICatalog, APIEndpoint.api_id == APICatalog.id)
-        .where(APIEndpoint.embedding.isnot(None))
+    # --- Search ChromaDB: Endpoint level ---
+    endpoint_results = vectorstore.search_endpoints(
+        query_embedding=query_embedding,
+        top_k=top_k * 2,
     )
 
-    if domain:
-        stmt = stmt.where(APICatalog.domain == domain)
-    if status:
-        stmt = stmt.where(APICatalog.status == status)
+    # --- Collect unique API IDs with scores ---
+    api_scores: dict[str, dict] = {}
 
-    stmt = stmt.order_by(similarity.desc()).limit(top_k * 2)
+    # API-level results
+    if api_results and api_results["ids"] and api_results["ids"][0]:
+        for i, api_id in enumerate(api_results["ids"][0]):
+            distance = api_results["distances"][0][i] if api_results["distances"] else 1.0
+            score = 1.0 - distance  # ChromaDB cosine distance → similarity
+            score *= 1.1  # 10% boost for API-level match
+            api_scores[api_id] = {
+                "score": score,
+                "match_reason": "API description matches your query",
+            }
 
-    result = await db.execute(stmt)
-    rows = result.all()
+    # Endpoint-level results — bubble up to parent API
+    if endpoint_results and endpoint_results["ids"] and endpoint_results["ids"][0]:
+        for i, ep_id in enumerate(endpoint_results["ids"][0]):
+            meta = endpoint_results["metadatas"][0][i] if endpoint_results["metadatas"] else {}
+            api_id = meta.get("api_id", "")
+            if not api_id:
+                continue
 
-    # Group endpoints by parent API
-    api_map: dict[UUID, dict] = {}
-    for row in rows:
-        endpoint, score, api = row
-        score = float(score)
-        if score <= settings.search_similarity_threshold:
+            distance = endpoint_results["distances"][0][i] if endpoint_results["distances"] else 1.0
+            score = 1.0 - distance
+
+            if api_id in api_scores:
+                # Already found via API-level — take the higher score
+                existing = api_scores[api_id]
+                if score > existing["score"]:
+                    existing["score"] = score
+                existing["match_reason"] += " | Also matched at endpoint level"
+            else:
+                method = meta.get("method", "")
+                path = meta.get("path", "")
+                api_scores[api_id] = {
+                    "score": score,
+                    "match_reason": f"Endpoint {method} {path} matches your query",
+                }
+
+    # --- Fetch full data from PostgreSQL ---
+    results = []
+    sorted_apis = sorted(api_scores.items(), key=lambda x: x[1]["score"], reverse=True)[:top_k]
+
+    for api_id_str, score_info in sorted_apis:
+        try:
+            api_uuid = UUID(api_id_str)
+        except ValueError:
             continue
 
-        api_id = api.id
-        if api_id not in api_map:
-            # Load endpoints for this API
-            ep_stmt = select(APIEndpoint).where(APIEndpoint.api_id == api_id)
-            ep_result = await db.execute(ep_stmt)
-            all_endpoints = list(ep_result.scalars().all())
+        # Fetch API with endpoints and annotations
+        stmt = (
+            select(APICatalog)
+            .options(selectinload(APICatalog.endpoints), selectinload(APICatalog.annotations))
+            .where(APICatalog.id == api_uuid)
+        )
+        result = await db.execute(stmt)
+        api = result.scalar_one_or_none()
 
-            api_map[api_id] = {
-                "api": api,
-                "endpoints": all_endpoints,
-                "matching_endpoints": [endpoint],
-                "relevance_score": score,
-                "match_reason": f"Endpoint {endpoint.method} {endpoint.path} matches your query",
-                "source": "endpoint_level",
-            }
-        else:
-            api_map[api_id]["matching_endpoints"].append(endpoint)
-            api_map[api_id]["relevance_score"] = max(
-                api_map[api_id]["relevance_score"], score
-            )
+        if not api:
+            continue
 
-    return list(api_map.values())
+        # Apply domain/status filters (in case ChromaDB metadata was incomplete)
+        if domain and api.domain != domain:
+            continue
+        if status and api.status != status:
+            continue
 
+        results.append({
+            "api": api,
+            "endpoints": list(api.endpoints),
+            "annotations": list(api.annotations),
+            "relevance_score": max(0.0, min(1.0, score_info["score"])),
+            "match_reason": score_info["match_reason"],
+        })
 
-def _merge_results(
-    api_results: list[dict],
-    endpoint_results: list[dict],
-    top_k: int,
-) -> list[dict]:
-    """Merge API-level and endpoint-level results, deduplicating by API ID."""
-    seen_apis: dict[UUID, dict] = {}
-
-    # API-level results get a slight boost since they matched at a higher level
-    for r in api_results:
-        api_id = r["api"].id
-        r["relevance_score"] *= 1.1  # 10% boost for API-level match
-        seen_apis[api_id] = r
-
-    # Endpoint-level results
-    for r in endpoint_results:
-        api_id = r["api"].id
-        if api_id in seen_apis:
-            # Already found via API-level search — boost score
-            existing = seen_apis[api_id]
-            existing["relevance_score"] = max(
-                existing["relevance_score"], r["relevance_score"]
-            )
-            existing["match_reason"] += f" | Also matched at endpoint level"
-        else:
-            seen_apis[api_id] = r
-
-    # Sort by score and return top_k
-    results = sorted(seen_apis.values(), key=lambda x: x["relevance_score"], reverse=True)
-    return results[:top_k]
-
-
-async def _get_annotations(db: AsyncSession, api_id: UUID) -> list[Annotation]:
-    """Fetch all annotations for an API."""
-    stmt = (
-        select(Annotation)
-        .where(Annotation.api_id == api_id)
-        .order_by(Annotation.created_at.desc())
-    )
-    result = await db.execute(stmt)
-    return list(result.scalars().all())
+    return results
 
 
 async def get_all_apis(db: AsyncSession) -> list[APICatalog]:

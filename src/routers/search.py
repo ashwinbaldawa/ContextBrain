@@ -1,8 +1,9 @@
 """Router for API search."""
 
 import logging
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
@@ -11,7 +12,6 @@ from src.schemas import (
     EndpointResponse, AnnotationResponse, APIListResponse, APIDetailResponse,
 )
 from src.services.search import search_apis, get_all_apis, get_api_by_id
-from uuid import UUID
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["Search & Browse"])
@@ -25,7 +25,7 @@ async def search(
     top_k: int = Query(5, ge=1, le=20, description="Number of results"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Semantic search across all APIs and endpoints."""
+    """Semantic search across all APIs and endpoints via ChromaDB + Gemini embeddings."""
     results = await search_apis(db, q, domain=domain, status=status, top_k=top_k)
 
     items = []
@@ -57,8 +57,6 @@ async def list_apis(db: AsyncSession = Depends(get_db)):
 @router.get("/apis/{api_id}", response_model=APIDetailResponse)
 async def get_api(api_id: UUID, db: AsyncSession = Depends(get_db)):
     """Get a single API with full details, endpoints, and annotations."""
-    from fastapi import HTTPException
-
     api = await get_api_by_id(db, api_id)
     if not api:
         raise HTTPException(status_code=404, detail="API not found")

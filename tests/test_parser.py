@@ -1,4 +1,4 @@
-"""Tests for APIBrain API endpoints."""
+"""Tests for ContextBrain API endpoints."""
 
 import pytest
 import json
