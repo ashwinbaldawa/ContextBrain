@@ -1,8 +1,8 @@
-# 🧠 APIBrain
+# 🧠 ContextBrain
 
 **AI-powered API Discovery Platform for Enterprise Organizations**
 
-APIBrain sits on top of your existing API gateway and transforms how developers discover, understand, and integrate internal APIs. Instead of chasing people across Slack and meetings to find the right API, developers ask APIBrain in natural language and get instant, context-rich answers.
+ContextBrain sits on top of your existing API gateway and transforms how developers discover, understand, and integrate internal APIs. Instead of chasing people across Slack and meetings to find the right API, developers ask ContextBrain in natural language and get instant, context-rich answers.
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green)
@@ -24,7 +24,7 @@ In large organizations with hundreds of internal APIs:
 ```
 Developer:  I need to verify if a member's health plan covers behavioral health services.
 
-APIBrain:   Found 2 relevant APIs:
+ContextBrain:   Found 2 relevant APIs:
 
             1. Benefits Eligibility API (v3.2) — Benefits Platform Team
                POST /v3/benefits/eligibility/check
@@ -40,7 +40,7 @@ APIBrain:   Found 2 relevant APIs:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    APIBrain                          │
+│                    ContextBrain                          │
 │                                                     │
 │  ┌─────────────┐  ┌──────────┐  ┌───────────────┐  │
 │  │  Ingestion   │  │  Search  │  │  Chat UI      │  │
@@ -75,8 +75,8 @@ For the full architecture and strategic plan, see [docs/architecture.md](docs/ar
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/apibrain.git
-cd apibrain
+git clone https://github.com/yourusername/ContextBrain.git
+cd ContextBrain
 
 # Configure environment
 cp .env.example .env
@@ -99,8 +99,8 @@ docker compose exec api python scripts/seed_sample_apis.py
 
 ```bash
 # Clone and install
-git clone https://github.com/yourusername/apibrain.git
-cd apibrain
+git clone https://github.com/yourusername/ContextBrain.git
+cd ContextBrain
 python -m venv .venv
 source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 pip install -r requirements.txt
@@ -125,7 +125,7 @@ uvicorn src.main:app --reload --port 8000
 ## Project Structure
 
 ```
-apibrain/
+ContextBrain/
 ├── src/
 │   ├── main.py              # FastAPI application entry point
 │   ├── config.py            # Application settings
@@ -181,10 +181,10 @@ apibrain/
 ## How It Works
 
 ### 1. Ingest APIs
-Upload OpenAPI/Swagger specs. APIBrain parses every endpoint, uses Claude to generate business-friendly descriptions, and creates vector embeddings for semantic search.
+Upload OpenAPI/Swagger specs. ContextBrain parses every endpoint, uses Claude to generate business-friendly descriptions, and creates vector embeddings for semantic search.
 
 ### 2. Discover APIs
-Ask questions in natural language. APIBrain searches semantically across all indexed APIs and returns the most relevant results with business context, ownership info, and community annotations.
+Ask questions in natural language. ContextBrain searches semantically across all indexed APIs and returns the most relevant results with business context, ownership info, and community annotations.
 
 ### 3. Annotate & Learn
 When developers discover gotchas, workarounds, or tips, they add annotations. These persist and appear automatically in future search results — building institutional knowledge over time.
